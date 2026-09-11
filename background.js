@@ -95,6 +95,13 @@ async function groupTabs() {
   const tabs = await chrome.tabs.query({ currentWindow: true });
   if (tabs.length === 0) return;
 
+  const currentWindow = await chrome.windows.get(tabs[0].windowId);
+  if (currentWindow.type !== "normal") {
+    throw new Error(
+      `This is a "${currentWindow.type}" window — tab grouping only works in a regular browser window. Click the icon from a normal window instead.`
+    );
+  }
+
   const existingGroups = await chrome.tabGroups.query({ windowId: tabs[0].windowId });
   const existingByTitle = new Map(
     existingGroups.filter((g) => g.title).map((g) => [g.title.toLowerCase(), g])
