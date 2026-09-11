@@ -2,7 +2,22 @@
 
 Chrome MV3 extension that groups open tabs by category using a local (or hosted) OpenAI-compatible chat completions endpoint.
 
-## Setup: local MLX (default)
+## Setup: NVIDIA-hosted endpoint (default, no local model needed)
+
+The extension defaults to NVIDIA's hosted OpenAI-compatible API:
+
+1. Get an API key from [build.nvidia.com](https://build.nvidia.com).
+2. Load the extension:
+   - Go to `chrome://extensions`
+   - Enable "Developer mode"
+   - Click "Load unpacked" and select this directory
+3. Right-click the extension icon → Options, and set:
+   - **Endpoint:** `https://integrate.api.nvidia.com/v1/chat/completions` (default)
+   - **Model:** `nvidia/nemotron-3.5-lightning-30b-a3b` (default) — or any other chat model listed on build.nvidia.com
+   - **API key:** your NVIDIA API key
+4. Save, then click the extension's toolbar icon to group the tabs in the current window.
+
+## Setup: local MLX instead
 
 MLX is Apple's Metal-native ML framework — on Apple Silicon it's typically faster than llama.cpp/Ollama, and `mlx_lm.server` speaks the same OpenAI-compatible API this extension expects.
 
@@ -14,22 +29,7 @@ MLX is Apple's Metal-native ML framework — on Apple Silicon it's typically fas
 2. **Keeping it "hot":** unlike Ollama, `mlx_lm.server` has no idle-unload timer — the model stays resident in memory for as long as the process runs, so the first click after startup is the only slow one. Options to keep it running:
    - Simplest: leave the `mlx_lm.server` terminal/tab running in the background while you work.
    - Persistent across logins/reboots: run it as a `launchd` agent (`~/Library/LaunchAgents/com.local.mlx-server.plist`) with `KeepAlive: true` so macOS restarts it if it dies. Ask me and I'll generate the plist.
-3. Load the extension:
-   - Go to `chrome://extensions`
-   - Enable "Developer mode"
-   - Click "Load unpacked" and select this directory
-4. Click the extension's toolbar icon to group the tabs in the current window.
-
-## Setup: NVIDIA-hosted endpoint (no local model)
-
-To skip running anything locally, point the extension at NVIDIA's OpenAI-compatible API instead:
-
-1. Get an API key from [build.nvidia.com](https://build.nvidia.com).
-2. Right-click the extension icon → Options, and set:
-   - **Endpoint:** `https://integrate.api.nvidia.com/v1/chat/completions`
-   - **Model:** e.g. `meta/llama-3.1-8b-instruct` (any chat model listed on build.nvidia.com)
-   - **API key:** your NVIDIA API key
-3. Save. No local server needed — tabs are now categorized via the cloud endpoint.
+3. In Options, set endpoint to `http://localhost:8080/v1/chat/completions` and model to `mlx-community/Llama-3.2-3B-Instruct-4bit`, leave API key blank.
 
 If you point the endpoint at a different host entirely (not localhost or `integrate.api.nvidia.com`), add it to `host_permissions` in `manifest.json` and reload the extension, or Chrome will block the request.
 

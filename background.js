@@ -1,6 +1,6 @@
 const DEFAULT_SETTINGS = {
-  endpoint: "http://localhost:8080/v1/chat/completions",
-  model: "mlx-community/Llama-3.2-3B-Instruct-4bit",
+  endpoint: "https://integrate.api.nvidia.com/v1/chat/completions",
+  model: "nvidia/nemotron-3.5-lightning-30b-a3b",
   apiKey: "",
 };
 
@@ -62,13 +62,19 @@ async function callChatCompletions({ endpoint, model, apiKey }, prompt) {
 
 async function groupTabs() {
   const settings = await getSettings();
+  console.log("Tab Grouper: querying tabs...");
   const tabs = await chrome.tabs.query({ currentWindow: true });
 
   const groupable = tabs.filter((t) => t.url && !t.url.startsWith("chrome://"));
-  if (groupable.length === 0) return;
+  if (groupable.length === 0) {
+    console.log("Tab Grouper: no groupable tabs, nothing to do.");
+    return;
+  }
 
+  console.log(`Tab Grouper: sending ${groupable.length} tabs to ${settings.endpoint} (${settings.model})...`);
   const prompt = buildPrompt(groupable);
   const assignments = await callChatCompletions(settings, prompt);
+  console.log("Tab Grouper: got category assignments:", assignments);
 
   const byCategory = new Map();
   for (const tab of groupable) {
@@ -79,6 +85,7 @@ async function groupTabs() {
   }
 
   let colorIndex = 0;
+  let groupsCreated = 0;
   for (const [category, tabIds] of byCategory) {
     if (tabIds.length < 2) continue;
     const groupId = await chrome.tabs.group({ tabIds });
@@ -87,13 +94,24 @@ async function groupTabs() {
       color: GROUP_COLORS[colorIndex % GROUP_COLORS.length],
     });
     colorIndex++;
+    groupsCreated++;
   }
+  console.log(`Tab Grouper: created ${groupsCreated} group(s).`);
 }
 
 chrome.action.onClicked.addListener(() => {
-  groupTabs().catch((err) => {
-    console.error("Tab Grouper failed:", err);
-    chrome.action.setBadgeText({ text: "!" });
-    chrome.action.setBadgeBackgroundColor({ color: "#d33" });
-  });
+  chrome.action.setBadgeText({ text: "..." });
+  chrome.action.setBadgeBackgroundColor({ color: "#888" });
+
+  groupTabs()
+    .then(() => {
+      chrome.action.setBadgeText({ text: "✓" });
+      chrome.action.setBadgeBackgroundColor({ color: "#2a2" });
+      setTimeout(() => chrome.action.setBadgeText({ text: "" }), 2000);
+    })
+    .catch((err) => {
+      console.error("Tab Grouper failed:", err);
+      chrome.action.setBadgeText({ text: "!" });
+      chrome.action.setBadgeBackgroundColor({ color: "#d33" });
+    });
 });

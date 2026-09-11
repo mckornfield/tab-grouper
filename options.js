@@ -1,6 +1,6 @@
 const DEFAULT_SETTINGS = {
-  endpoint: "http://localhost:8080/v1/chat/completions",
-  model: "mlx-community/Llama-3.2-3B-Instruct-4bit",
+  endpoint: "https://integrate.api.nvidia.com/v1/chat/completions",
+  model: "nvidia/nemotron-3.5-lightning-30b-a3b",
   apiKey: "",
 };
 
