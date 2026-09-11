@@ -1,0 +1,99 @@
+const DEFAULT_SETTINGS = {
+  endpoint: "http://localhost:8080/v1/chat/completions",
+  model: "mlx-community/Llama-3.2-3B-Instruct-4bit",
+  apiKey: "",
+};
+
+const GROUP_COLORS = [
+  "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange", "grey",
+];
+
+async function getSettings() {
+  const stored = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+  return { ...DEFAULT_SETTINGS, ...stored };
+}
+
+function buildPrompt(tabs) {
+  const tabList = tabs
+    .map((t) => `${t.id}\t${t.title}\t${t.url}`)
+    .join("\n");
+
+  return `You are categorizing browser tabs into short topical groups.
+Given the tabs below (tab_id, title, url), assign each tab_id to a short category label (1-3 words, e.g. "Shopping", "Docs", "Social Media", "Work").
+Use as few distinct categories as reasonable. Respond with ONLY a JSON object mapping tab_id (string) to category (string), no other text.
+
+Tabs:
+${tabList}`;
+}
+
+function extractJson(text) {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end === -1) {
+    throw new Error(`Model response did not contain JSON: ${text}`);
+  }
+  return JSON.parse(text.slice(start, end + 1));
+}
+
+async function callChatCompletions({ endpoint, model, apiKey }, prompt) {
+  const headers = { "Content-Type": "application/json" };
+  if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      stream: false,
+      temperature: 0,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Chat completions request failed: ${res.status} ${res.statusText}`);
+  }
+
+  const data = await res.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error("No content in model response");
+  return extractJson(content);
+}
+
+async function groupTabs() {
+  const settings = await getSettings();
+  const tabs = await chrome.tabs.query({ currentWindow: true });
+
+  const groupable = tabs.filter((t) => t.url && !t.url.startsWith("chrome://"));
+  if (groupable.length === 0) return;
+
+  const prompt = buildPrompt(groupable);
+  const assignments = await callChatCompletions(settings, prompt);
+
+  const byCategory = new Map();
+  for (const tab of groupable) {
+    const category = assignments[String(tab.id)];
+    if (!category) continue;
+    if (!byCategory.has(category)) byCategory.set(category, []);
+    byCategory.get(category).push(tab.id);
+  }
+
+  let colorIndex = 0;
+  for (const [category, tabIds] of byCategory) {
+    if (tabIds.length < 2) continue;
+    const groupId = await chrome.tabs.group({ tabIds });
+    await chrome.tabGroups.update(groupId, {
+      title: category,
+      color: GROUP_COLORS[colorIndex % GROUP_COLORS.length],
+    });
+    colorIndex++;
+  }
+}
+
+chrome.action.onClicked.addListener(() => {
+  groupTabs().catch((err) => {
+    console.error("Tab Grouper failed:", err);
+    chrome.action.setBadgeText({ text: "!" });
+    chrome.action.setBadgeBackgroundColor({ color: "#d33" });
+  });
+});
