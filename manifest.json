@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Tab Grouper (Local LLM)",
+  "name": "Tab Grouper",
   "version": "0.1.0",
   "description": "Groups open tabs by category using a local Ollama model.",
   "permissions": ["tabs", "tabGroups", "storage"],

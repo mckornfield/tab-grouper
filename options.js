@@ -45,9 +45,13 @@ async function test() {
       headers,
       body: JSON.stringify({
         model,
-        messages: [{ role: "user", content: "Reply with only the word: pong" }],
+        messages: [
+          { role: "system", content: "detailed thinking off" },
+          { role: "user", content: "Reply with only the word: pong" },
+        ],
         temperature: 0,
         stream: false,
+        max_tokens: 64,
       }),
       signal: controller.signal,
     });

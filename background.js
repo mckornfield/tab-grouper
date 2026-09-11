@@ -58,9 +58,15 @@ async function callChatCompletions({ endpoint, model, apiKey }, prompt) {
       headers,
       body: JSON.stringify({
         model,
-        messages: [{ role: "user", content: prompt }],
+        // Nemotron models can emit a long internal reasoning trace by default,
+        // which blows up latency for a simple classification task. Turn it off.
+        messages: [
+          { role: "system", content: "detailed thinking off" },
+          { role: "user", content: prompt },
+        ],
         stream: false,
         temperature: 0,
+        max_tokens: 1024,
       }),
       signal: controller.signal,
     });

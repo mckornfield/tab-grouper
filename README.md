@@ -1,4 +1,4 @@
-# Tab Grouper (Local LLM)
+# Tab Grouper
 
 Chrome MV3 extension that groups open tabs by category using a local (or hosted) OpenAI-compatible chat completions endpoint.
 
