@@ -35,20 +35,36 @@ function extractJson(text) {
   return JSON.parse(text.slice(start, end + 1));
 }
 
+const REQUEST_TIMEOUT_MS = 30000;
+
 async function callChatCompletions({ endpoint, model, apiKey }, prompt) {
   const headers = { "Content-Type": "application/json" };
   if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
 
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "user", content: prompt }],
-      stream: false,
-      temperature: 0,
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let res;
+  try {
+    res = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: prompt }],
+        stream: false,
+        temperature: 0,
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error(`Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!res.ok) {
     throw new Error(`Chat completions request failed: ${res.status} ${res.statusText}`);
@@ -65,7 +81,7 @@ async function groupTabs() {
   console.log("Tab Grouper: querying tabs...");
   const tabs = await chrome.tabs.query({ currentWindow: true });
 
-  const groupable = tabs.filter((t) => t.url && !t.url.startsWith("chrome://"));
+  const groupable = tabs.filter((t) => t.url && !t.url.startsWith("chrome://") && !t.pinned);
   if (groupable.length === 0) {
     console.log("Tab Grouper: no groupable tabs, nothing to do.");
     return;
@@ -99,7 +115,15 @@ async function groupTabs() {
   console.log(`Tab Grouper: created ${groupsCreated} group(s).`);
 }
 
+let running = false;
+
 chrome.action.onClicked.addListener(() => {
+  if (running) {
+    console.log("Tab Grouper: already running, ignoring click.");
+    return;
+  }
+  running = true;
+
   chrome.action.setBadgeText({ text: "..." });
   chrome.action.setBadgeBackgroundColor({ color: "#888" });
 
@@ -113,5 +137,8 @@ chrome.action.onClicked.addListener(() => {
       console.error("Tab Grouper failed:", err);
       chrome.action.setBadgeText({ text: "!" });
       chrome.action.setBadgeBackgroundColor({ color: "#d33" });
+    })
+    .finally(() => {
+      running = false;
     });
 });
