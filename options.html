@@ -33,7 +33,7 @@
   <label>
     Categories (optional, comma-separated)
     <textarea id="categories" rows="2" placeholder="e.g. Code, Docs, AI, Shopping, Social"></textarea>
-    <div class="hint">If set, every tab is forced into one of these categories (always grouped, even if only one tab matches). If left blank, the model picks freeform categories and only groups 2+ matching tabs.</div>
+    <div class="hint">If set, the model is asked to prefer these categories (and close matches get snapped to them), but can still fall back to a different one for tabs that don't fit. Any tab matched to one of these always groups, even if only one tab matches. If left blank, the model picks freeform categories and only groups 2+ matching tabs.</div>
   </label>
   <button id="save">Save</button>
   <button id="test">Test connection</button>

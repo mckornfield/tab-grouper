@@ -25,13 +25,13 @@ If a tab clearly belongs in one of these, reuse that exact category name so it g
     : "";
 
   const categorySection = fixedCategories.length
-    ? `\nYou MUST assign every tab to exactly one of these categories, choosing the closest fit even if the match is loose: ${fixedCategories.join(", ")}.\n`
+    ? `\nPreferred categories: ${fixedCategories.join(", ")}. Use one of these when a tab reasonably fits. If a tab doesn't fit any of them well, it's fine to use a different short category instead.\n`
     : `\nUse a short category label (1-3 words, e.g. "Shopping", "Docs", "Social Media", "Work") and use as few distinct categories as reasonable.\n`;
 
   return `You are categorizing browser tabs into short topical groups.
 Given the tabs below (tab_id, title, url), assign each tab_id to a category.
 ${categorySection}${existingSection}
-Respond with ONLY a JSON object mapping tab_id (string) to category (string), no other text. Every tab_id below must appear as a key.
+Respond with ONLY a JSON object mapping tab_id (string) to category (string) — no explanation, no other text before or after it. Every tab_id below must appear as a key.
 
 Tabs:
 ${tabList}`;
@@ -60,9 +60,13 @@ function extractJson(text) {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start === -1 || end === -1) {
-    throw new Error(`Model response did not contain JSON: ${text}`);
+    throw new Error(`Model response did not contain JSON: ${text.slice(0, 500)}`);
   }
-  return JSON.parse(text.slice(start, end + 1));
+  try {
+    return JSON.parse(text.slice(start, end + 1));
+  } catch (err) {
+    throw new Error(`Failed to parse JSON from model response (${err.message}): ${text.slice(0, 500)}`);
+  }
 }
 
 const REQUEST_TIMEOUT_MS = 60000;
