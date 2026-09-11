@@ -2,6 +2,7 @@ const DEFAULT_SETTINGS = {
   endpoint: "https://integrate.api.nvidia.com/v1/chat/completions",
   model: "nvidia/nemotron-3.5-lightning-30b-a3b",
   apiKey: "",
+  categories: "",
 };
 
 async function load() {
@@ -9,13 +10,15 @@ async function load() {
   document.getElementById("endpoint").value = settings.endpoint;
   document.getElementById("model").value = settings.model;
   document.getElementById("apiKey").value = settings.apiKey;
+  document.getElementById("categories").value = settings.categories;
 }
 
 async function save() {
   const endpoint = document.getElementById("endpoint").value.trim();
   const model = document.getElementById("model").value.trim();
   const apiKey = document.getElementById("apiKey").value.trim();
-  await chrome.storage.sync.set({ endpoint, model, apiKey });
+  const categories = document.getElementById("categories").value.trim();
+  await chrome.storage.sync.set({ endpoint, model, apiKey, categories });
   const status = document.getElementById("status");
   status.textContent = "Saved.";
   setTimeout(() => (status.textContent = ""), 1500);

@@ -2,6 +2,7 @@ const DEFAULT_SETTINGS = {
   endpoint: "https://integrate.api.nvidia.com/v1/chat/completions",
   model: "nvidia/nemotron-3.5-lightning-30b-a3b",
   apiKey: "",
+  categories: "",
 };
 
 const GROUP_COLORS = [
@@ -13,21 +14,24 @@ async function getSettings() {
   return { ...DEFAULT_SETTINGS, ...stored };
 }
 
-function buildPrompt(tabs, existingGroupTitles) {
+function buildPrompt(tabs, existingGroupTitles, fixedCategories) {
   const tabList = tabs
     .map((t) => `${t.id}\t${t.title}\t${t.url}`)
     .join("\n");
 
   const existingSection = existingGroupTitles.length
     ? `\nExisting tab groups already open: ${existingGroupTitles.join(", ")}.
-If a tab clearly belongs in one of these, reuse that exact category name so it gets added to the existing group instead of creating a duplicate. Otherwise pick a new short category.\n`
+If a tab clearly belongs in one of these, reuse that exact category name so it gets added to the existing group instead of creating a duplicate.\n`
     : "";
 
+  const categorySection = fixedCategories.length
+    ? `\nYou MUST assign every tab to exactly one of these categories, choosing the closest fit even if the match is loose: ${fixedCategories.join(", ")}.\n`
+    : `\nUse a short category label (1-3 words, e.g. "Shopping", "Docs", "Social Media", "Work") and use as few distinct categories as reasonable.\n`;
+
   return `You are categorizing browser tabs into short topical groups.
-Given the tabs below (tab_id, title, url), assign each tab_id to a short category label (1-3 words, e.g. "Shopping", "Docs", "Social Media", "Work").
-Use as few distinct categories as reasonable.
-${existingSection}
-Respond with ONLY a JSON object mapping tab_id (string) to category (string), no other text.
+Given the tabs below (tab_id, title, url), assign each tab_id to a category.
+${categorySection}${existingSection}
+Respond with ONLY a JSON object mapping tab_id (string) to category (string), no other text. Every tab_id below must appear as a key.
 
 Tabs:
 ${tabList}`;
@@ -116,9 +120,15 @@ async function groupTabs() {
     return;
   }
 
+  const fixedCategories = (settings.categories || "")
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
+  const fixedCategoriesLower = new Set(fixedCategories.map((c) => c.toLowerCase()));
+
   const existingTitles = existingGroups.map((g) => g.title).filter(Boolean);
-  console.log(`Tab Grouper: sending ${groupable.length} tabs to ${settings.endpoint} (${settings.model})... existing groups: ${existingTitles.join(", ") || "none"}`);
-  const prompt = buildPrompt(groupable, existingTitles);
+  console.log(`Tab Grouper: sending ${groupable.length} tabs to ${settings.endpoint} (${settings.model})... existing groups: ${existingTitles.join(", ") || "none"}, fixed categories: ${fixedCategories.join(", ") || "none"}`);
+  const prompt = buildPrompt(groupable, existingTitles, fixedCategories);
   const assignments = await callChatCompletions(settings, prompt);
   console.log("Tab Grouper: got category assignments:", assignments);
 
@@ -141,7 +151,9 @@ async function groupTabs() {
       continue;
     }
 
-    if (tabIds.length < 2) continue;
+    // Ad-hoc/freeform categories need 2+ tabs to avoid singleton clutter, but
+    // a category the user explicitly configured is a group they always want.
+    if (tabIds.length < 2 && !fixedCategoriesLower.has(category.toLowerCase())) continue;
     const groupId = await chrome.tabs.group({ tabIds });
     await chrome.tabGroups.update(groupId, {
       title: category,
