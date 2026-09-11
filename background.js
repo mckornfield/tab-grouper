@@ -37,6 +37,25 @@ Tabs:
 ${tabList}`;
 }
 
+function snapToFixedCategory(category, fixedCategories) {
+  if (!fixedCategories.length) return category;
+  const norm = category.trim().toLowerCase();
+
+  const exact = fixedCategories.find((fc) => fc.toLowerCase() === norm);
+  if (exact) return exact;
+
+  // Model drifted from the configured list (e.g. "GitHub" instead of "Docs") —
+  // snap to the closest configured category by substring overlap rather than
+  // letting it become a stray one-off category.
+  const substring = fixedCategories.find((fc) => {
+    const fcNorm = fc.toLowerCase();
+    return norm.includes(fcNorm) || fcNorm.includes(norm);
+  });
+  if (substring) return substring;
+
+  return category;
+}
+
 function extractJson(text) {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
@@ -134,8 +153,9 @@ async function groupTabs() {
 
   const byCategory = new Map();
   for (const tab of groupable) {
-    const category = assignments[String(tab.id)];
+    let category = assignments[String(tab.id)];
     if (!category) continue;
+    category = snapToFixedCategory(category, fixedCategories);
     if (!byCategory.has(category)) byCategory.set(category, []);
     byCategory.get(category).push(tab.id);
   }
@@ -146,9 +166,16 @@ async function groupTabs() {
   for (const [category, tabIds] of byCategory) {
     const existing = existingByTitle.get(category.toLowerCase());
     if (existing) {
-      await chrome.tabs.group({ tabIds, groupId: existing.id });
-      addedToExisting += tabIds.length;
-      continue;
+      try {
+        await chrome.tabs.group({ tabIds, groupId: existing.id });
+        addedToExisting += tabIds.length;
+        continue;
+      } catch (err) {
+        // Group may have been closed/emptied since we queried it — fall back
+        // to creating a fresh group instead of failing the whole run.
+        console.warn(`Tab Grouper: existing group "${category}" is stale, creating a new one instead:`, err);
+        existingByTitle.delete(category.toLowerCase());
+      }
     }
 
     // Ad-hoc/freeform categories need 2+ tabs to avoid singleton clutter, but
