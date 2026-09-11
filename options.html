@@ -7,14 +7,18 @@
     body { font-family: system-ui, sans-serif; padding: 16px; width: 320px; }
     label { display: block; margin-top: 12px; font-size: 13px; color: #333; }
     input { width: 100%; box-sizing: border-box; padding: 6px; margin-top: 4px; }
-    button { margin-top: 16px; padding: 6px 12px; }
+    button { margin-top: 16px; padding: 6px 12px; margin-right: 8px; }
     #status { margin-top: 8px; font-size: 12px; color: #2a2; }
+    #testStatus { margin-top: 8px; font-size: 12px; }
+    #testStatus.ok { color: #2a2; }
+    #testStatus.err { color: #d33; }
+    #testStatus.pending { color: #888; }
   </style>
 </head>
 <body>
   <h3>Tab Grouper Settings</h3>
   <label>
-    Ollama endpoint
+    Chat completions endpoint
     <input id="endpoint" type="text" />
   </label>
   <label>
@@ -26,7 +30,9 @@
     <input id="apiKey" type="password" />
   </label>
   <button id="save">Save</button>
+  <button id="test">Test connection</button>
   <div id="status"></div>
+  <div id="testStatus"></div>
   <script src="options.js"></script>
 </body>
 </html>

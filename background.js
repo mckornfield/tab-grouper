@@ -42,7 +42,7 @@ function extractJson(text) {
   return JSON.parse(text.slice(start, end + 1));
 }
 
-const REQUEST_TIMEOUT_MS = 30000;
+const REQUEST_TIMEOUT_MS = 60000;
 
 async function callChatCompletions({ endpoint, model, apiKey }, prompt) {
   const headers = { "Content-Type": "application/json" };
