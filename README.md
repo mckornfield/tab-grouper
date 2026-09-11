@@ -35,7 +35,8 @@ If you point the endpoint at a different host entirely (not localhost or `integr
 
 ## How it works
 
-- `background.js` queries open tabs in the current window, sends their titles/URLs to the configured chat completions endpoint, and asks it to return a JSON mapping of tab ID → category.
+- `background.js` queries tabs in the current window that aren't already in a group (pinned tabs and chrome:// tabs are skipped too), along with the titles of any existing tab groups, and sends both to the configured chat completions endpoint, asking for a JSON mapping of tab ID → category.
+- If a tab's category matches an existing group's title (case-insensitive), it's added to that group instead of creating a duplicate. New categories only form a group once they have 2+ tabs.
 - Any OpenAI-compatible `/v1/chat/completions` endpoint works — MLX, Ollama (with its OpenAI-compat routes), LM Studio, or NVIDIA's hosted API — just update the endpoint/model/API key in Options.
-- Tabs are grouped via `chrome.tabs.group` / `chrome.tabGroups.update`. Categories with only one tab are left ungrouped.
+- Tabs are grouped via `chrome.tabs.group` / `chrome.tabGroups.update`.
 - If the request fails, the toolbar icon shows a red "!" badge — check the service worker console at `chrome://extensions` for details.

@@ -13,14 +13,21 @@ async function getSettings() {
   return { ...DEFAULT_SETTINGS, ...stored };
 }
 
-function buildPrompt(tabs) {
+function buildPrompt(tabs, existingGroupTitles) {
   const tabList = tabs
     .map((t) => `${t.id}\t${t.title}\t${t.url}`)
     .join("\n");
 
+  const existingSection = existingGroupTitles.length
+    ? `\nExisting tab groups already open: ${existingGroupTitles.join(", ")}.
+If a tab clearly belongs in one of these, reuse that exact category name so it gets added to the existing group instead of creating a duplicate. Otherwise pick a new short category.\n`
+    : "";
+
   return `You are categorizing browser tabs into short topical groups.
 Given the tabs below (tab_id, title, url), assign each tab_id to a short category label (1-3 words, e.g. "Shopping", "Docs", "Social Media", "Work").
-Use as few distinct categories as reasonable. Respond with ONLY a JSON object mapping tab_id (string) to category (string), no other text.
+Use as few distinct categories as reasonable.
+${existingSection}
+Respond with ONLY a JSON object mapping tab_id (string) to category (string), no other text.
 
 Tabs:
 ${tabList}`;
@@ -80,15 +87,25 @@ async function groupTabs() {
   const settings = await getSettings();
   console.log("Tab Grouper: querying tabs...");
   const tabs = await chrome.tabs.query({ currentWindow: true });
+  if (tabs.length === 0) return;
 
-  const groupable = tabs.filter((t) => t.url && !t.url.startsWith("chrome://") && !t.pinned);
+  const existingGroups = await chrome.tabGroups.query({ windowId: tabs[0].windowId });
+  const existingByTitle = new Map(
+    existingGroups.filter((g) => g.title).map((g) => [g.title.toLowerCase(), g])
+  );
+
+  // Only categorize tabs not already in a group, so manually-organized groups are left alone.
+  const groupable = tabs.filter(
+    (t) => t.url && !t.url.startsWith("chrome://") && !t.pinned && t.groupId === -1
+  );
   if (groupable.length === 0) {
     console.log("Tab Grouper: no groupable tabs, nothing to do.");
     return;
   }
 
-  console.log(`Tab Grouper: sending ${groupable.length} tabs to ${settings.endpoint} (${settings.model})...`);
-  const prompt = buildPrompt(groupable);
+  const existingTitles = existingGroups.map((g) => g.title).filter(Boolean);
+  console.log(`Tab Grouper: sending ${groupable.length} tabs to ${settings.endpoint} (${settings.model})... existing groups: ${existingTitles.join(", ") || "none"}`);
+  const prompt = buildPrompt(groupable, existingTitles);
   const assignments = await callChatCompletions(settings, prompt);
   console.log("Tab Grouper: got category assignments:", assignments);
 
@@ -102,7 +119,15 @@ async function groupTabs() {
 
   let colorIndex = 0;
   let groupsCreated = 0;
+  let addedToExisting = 0;
   for (const [category, tabIds] of byCategory) {
+    const existing = existingByTitle.get(category.toLowerCase());
+    if (existing) {
+      await chrome.tabs.group({ tabIds, groupId: existing.id });
+      addedToExisting += tabIds.length;
+      continue;
+    }
+
     if (tabIds.length < 2) continue;
     const groupId = await chrome.tabs.group({ tabIds });
     await chrome.tabGroups.update(groupId, {
@@ -112,7 +137,7 @@ async function groupTabs() {
     colorIndex++;
     groupsCreated++;
   }
-  console.log(`Tab Grouper: created ${groupsCreated} group(s).`);
+  console.log(`Tab Grouper: created ${groupsCreated} group(s), added ${addedToExisting} tab(s) to existing groups.`);
 }
 
 let running = false;
