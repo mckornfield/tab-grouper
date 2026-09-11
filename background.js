@@ -93,7 +93,7 @@ async function callChatCompletions({ endpoint, model, apiKey }, prompt) {
         ],
         stream: false,
         temperature: 0,
-        max_tokens: 1024,
+        max_tokens: 4096,
       }),
       signal: controller.signal,
     });
@@ -111,8 +111,14 @@ async function callChatCompletions({ endpoint, model, apiKey }, prompt) {
   }
 
   const data = await res.json();
-  const content = data.choices?.[0]?.message?.content;
+  const choice = data.choices?.[0];
+  const content = choice?.message?.content;
   if (!content) throw new Error("No content in model response");
+  if (choice.finish_reason === "length") {
+    throw new Error(
+      `Model response got cut off (hit max_tokens) before finishing — try fewer tabs at once or raise max_tokens in background.js.`
+    );
+  }
   return extractJson(content);
 }
 
